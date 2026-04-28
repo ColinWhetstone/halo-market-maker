@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Implied Volatility Surface — QFC</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0a0a0a;
+      --bg-card:      #0e0e0e;
+      --bg-elevated:  #131313;
+      --border:       #1c1c1c;
+      --border-sub:   #161616;
+      --text:         #e2e2e2;
+      --text-dim:     #808080;
+      --text-muted:   #444;
+      --accent:       #4fa8e8;
+      --accent-glow:  rgba(79,168,232,0.12);
+      --btc:          #f7931a;
+      --eth:          #8b9ef4;
+      --green:        #22c55e;
+      --yellow:       #eab308;
+      --red:          #ef4444;
+      --font:         'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 28px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hdr-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--text);
+    }
+
+    .hdr-sub {
+      font-size: 9.5px;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+      margin-top: 3px;
+      text-transform: uppercase;
+    }
+
+    .hdr-meta {
+      text-align: right;
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    .hdr-meta .ts { color: var(--accent); }
+
+    /* ── Control bar ─────────────────────────────────────────── */
+    .ctrl {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 9px 28px;
+      border-bottom: 1px solid var(--border-sub);
+      background: var(--bg-card);
+    }
+
+    .ctrl-label {
+      font-size: 9.5px;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+    }
+
+    .seg {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .seg-btn {
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 5px 14px;
+      font: inherit;
+      font-size: 10.5px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .seg-btn:last-child { border-right: none; }
+
+    .seg-btn.on {
+      background: var(--accent-glow);
+      color: var(--accent);
+    }
+
+    .seg-btn:hover:not(.on) {
+      background: #141414;
+      color: var(--text);
+    }
+
+    /* ── Main grid ───────────────────────────────────────────── */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 20px 28px;
+      min-height: calc(100vh - 120px);
+    }
+
+    @media (max-width: 860px) {
+      .main { grid-template-columns: 1fr; }
+    }
+
+    /* ── Asset card ──────────────────────────────────────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid var(--border-sub);
+      flex-shrink: 0;
+    }
+
+    .asset-name {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .asset-name.btc { color: var(--btc); }
+    .asset-name.eth { color: var(--eth); }
+
+    .card-meta {
+      font-size: 9.5px;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    /* ── Plot ────────────────────────────────────────────────── */
+    .plot-wrap {
+      flex: 1;
+      min-height: 400px;
+      position: relative;
+    }
+
+    .plot-div {
+      width: 100%;
+      height: 100%;
+      min-height: 400px;
+    }
+
+    /* ── SVI section ─────────────────────────────────────────── */
+    .svi-section {
+      border-top: 1px solid var(--border-sub);
+      flex-shrink: 0;
+    }
+
+    .svi-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border-sub);
+      flex-wrap: wrap;
+    }
+
+    .svi-toolbar-label {
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .exp-tabs {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .exp-tab {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 2px 9px;
+      font: inherit;
+      font-size: 9.5px;
+      letter-spacing: 0.06em;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+
+    .exp-tab.on {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .exp-tab:hover:not(.on) {
+      border-color: #2a2a2a;
+      color: var(--text-dim);
+    }
+
+    /* ── Params row ──────────────────────────────────────────── */
+    .params-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      padding: 0;
+    }
+
+    .param-cell {
+      padding: 8px 14px;
+      border-right: 1px solid var(--border-sub);
+      border-bottom: 1px solid var(--border-sub);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .param-cell:nth-child(3n) { border-right: none; }
+    .param-cell:nth-last-child(-n+3) { border-bottom: none; }
+
+    .p-label {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .p-val {
+      font-size: 12px;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    .p-val.accent { color: var(--accent); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      border-radius: 2px;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+    }
+
+    .badge.good { background: rgba(34,197,94,.1);  color: var(--green);  border: 1px solid rgba(34,197,94,.2);  }
+    .badge.warn { background: rgba(234,179,8,.1);  color: var(--yellow); border: 1px solid rgba(234,179,8,.2);  }
+    .badge.bad  { background: rgba(239,68,68,.1);  color: var(--red);    border: 1px solid rgba(239,68,68,.2);  }
+
+    /* ── States ──────────────────────────────────────────────── */
+    .state-box {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+      gap: 12px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      font-size: 11px;
+    }
+
+    .dot-anim span {
+      display: inline-block;
+      animation: pulse 1.4s infinite;
+      font-size: 18px;
+      color: var(--accent);
+    }
+    .dot-anim span:nth-child(2) { animation-delay: 0.2s; }
+    .dot-anim span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes pulse {
+      0%, 80%, 100% { opacity: 0.15; transform: translateY(0); }
+      40%            { opacity: 1;    transform: translateY(-3px); }
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .ftr {
+      border-top: 1px solid var(--border-sub);
+      padding: 11px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: var(--bg-card);
+    }
+
+    .ftr-text {
+      font-size: 9.5px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    .ftr-text .formula {
+      color: #383838;
+      font-size: 9px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="hdr">
+  <div>
+    <div class="hdr-title">IMPLIED VOLATILITY SURFACE</div>
+    <div class="hdr-sub">BTC &middot; ETH &nbsp;&bull;&nbsp; Deribit Public API &nbsp;&bull;&nbsp; SVI Parametrization</div>
+  </div>
+  <div class="hdr-meta">
+    GENERATED&nbsp;<span class="ts" id="ts-val">&mdash;</span>
+  </div>
+</header>
+
+<!-- ── Controls ────────────────────────────────────────────────────────────── -->
+<div class="ctrl">
+  <span class="ctrl-label">DISPLAY</span>
+  <div class="seg">
+    <button class="seg-btn on" id="btn-iv" onclick="setMode('iv')">IMPLIED VOLATILITY</button>
+    <button class="seg-btn"    id="btn-tv" onclick="setMode('tv')">TOTAL VARIANCE</button>
+  </div>
+</div>
+
+<!-- ── Main ────────────────────────────────────────────────────────────────── -->
+<div class="main" id="main">
+  <div class="state-box">
+    <div class="dot-anim"><span>&bull;</span><span>&bull;</span><span>&bull;</span></div>
+    <div>LOADING SURFACE DATA</div>
+  </div>
+</div>
+
+<!-- ── Footer ──────────────────────────────────────────────────────────────── -->
+<footer class="ftr">
+  <div class="ftr-text">
+    <span class="formula">w(k) = a + b&thinsp;&middot;&thinsp;(&rho;&thinsp;(k&minus;m) + &radic;((k&minus;m)&sup2; + &sigma;&sup2;))&ensp;&bull;&ensp;k&nbsp;=&nbsp;log(K/F)&ensp;&bull;&ensp;L-BFGS-B minimisation, 5 starting points</span>
+  </div>
+  <div class="ftr-text">QFC &nbsp;&bull;&nbsp; Data: Deribit</div>
+</footer>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════════════════
+let DATA        = null;   // parsed vol_surface_data.json
+let MODE        = 'iv';   // 'iv' | 'tv'
+const SEL_EXP   = {};     // { BTC: 0, ETH: 0 } — selected expiry index
+
+const ASSETS    = ['BTC', 'ETH'];
+
+// ════════════════════════════════════════════════════════════════════
+//  Colorscale — cool blue (low IV) → warm red (high IV)
+// ════════════════════════════════════════════════════════════════════
+const CS = [
+  [0.00, '#08306b'],
+  [0.12, '#1565c0'],
+  [0.28, '#1e88e5'],
+  [0.44, '#42a5f5'],
+  [0.50, '#b2dfdb'],
+  [0.60, '#ffcc02'],
+  [0.74, '#fb8c00'],
+  [0.88, '#e53935'],
+  [1.00, '#7b0000'],
+];
+
+// ════════════════════════════════════════════════════════════════════
+//  Plotly helpers
+// ════════════════════════════════════════════════════════════════════
+const PLOTLY_CFG = { displayModeBar: false, responsive: true };
+
+function sceneLayout(mode) {
+  const zLabel = mode === 'iv' ? 'IV (%)' : 'Total Variance';
+  const axStyle = {
+    gridcolor:       '#1a1a1a',
+    linecolor:       '#222',
+    zerolinecolor:   '#222',
+    tickfont:        { size: 8.5, color: '#4a4a4a' },
+    backgroundcolor: '#0a0a0a',
+    showbackground:  true,
+  };
+  return {
+    bgcolor: '#0a0a0a',
+    camera:  { eye: { x: 1.6, y: -1.9, z: 0.85 }, up: { x: 0, y: 0, z: 1 } },
+    xaxis: { ...axStyle, title: { text: 'Strike', font: { size: 9, color: '#555' } }, tickformat: ',.0f' },
+    yaxis: { ...axStyle, title: { text: 'Expiry', font: { size: 9, color: '#555' } } },
+    zaxis: { ...axStyle, title: { text: zLabel, font: { size: 9, color: '#555' } } },
+    aspectmode: 'manual',
+    aspectratio: { x: 1.4, y: 0.9, z: 0.65 },
+  };
+}
+
+function makeLayout(mode) {
+  return {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor:  'rgba(0,0,0,0)',
+    margin:        { l: 0, r: 0, t: 0, b: 0 },
+    font:          { family: "'SF Mono','Fira Code','Consolas',monospace", color: '#555', size: 9 },
+    scene: sceneLayout(mode),
+    modebar: { bgcolor: 'transparent', color: '#333', activecolor: '#4fa8e8' },
+  };
+}
+
+function buildTrace(grid, mode) {
+  const N     = grid.T_values.length;
+  const nK    = grid.k_grid.length;
+
+  // y-axis: use DTE (days) as numeric values; tick labels show expiry names
+  const dte      = grid.T_values.map(T => parseFloat((T * 365.25).toFixed(2)));
+  const yMatrix  = dte.map(d => Array(nK).fill(d));
+  const yTick    = dte;
+  const yLabels  = grid.expiries.map((e, i) =>
+    `${e.slice(0,2)}-${e.slice(2,5)}-${e.slice(5)} (${Math.round(dte[i])}d)`
+  );
+
+  const zData    = mode === 'iv' ? grid.iv_grid : grid.tv_grid;
+  const flat     = zData.flat();
+  const zMin     = Math.min(...flat);
+  const zMax     = Math.max(...flat);
+
+  const hoverFmt = mode === 'iv'
+    ? 'Strike: <b>%{x:,.0f}</b><br>Expiry: %{y:.2f}d<br>IV: <b>%{z:.2f}%</b><extra></extra>'
+    : 'Strike: <b>%{x:,.0f}</b><br>Expiry: %{y:.2f}d<br>TotVar: <b>%{z:.5f}</b><extra></extra>';
+
+  return {
+    type:          'surface',
+    x:             grid.strike_grid,   // 2-D [nExp × nGrid]
+    y:             yMatrix,            // 2-D [nExp × nGrid]
+    z:             zData,
+    colorscale:    CS,
+    cmin:          zMin,
+    cmax:          zMax,
+    showscale:     true,
+    colorbar: {
+      thickness:  8,
+      len:        0.65,
+      x:          1.01,
+      xpad:       2,
+      tickfont:   { size: 8, color: '#4a4a4a' },
+      tickformat: mode === 'iv' ? '.1f' : '.4f',
+      title:      { text: mode === 'iv' ? 'IV %' : 'w(k)', side: 'right', font: { size: 8, color: '#4a4a4a' } },
+    },
+    lighting: {
+      ambient:     0.7,
+      diffuse:     0.6,
+      specular:    0.1,
+      roughness:   0.8,
+      fresnel:     0.1,
+    },
+    lightposition:  { x: 1, y: 1, z: 1 },
+    opacity:        0.92,
+    hovertemplate:  hoverFmt,
+    // stash for layout patch — removed before Plotly call
+    _yTick:   yTick,
+    _yLabel:  yLabels,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Render surface
+// ════════════════════════════════════════════════════════════════════
+function plotSurface(asset, mode) {
+  const grid   = DATA.assets[asset].interpolated_grid;
+  const el     = document.getElementById(`plot-${asset}`);
+  if (!el) return;
+
+  const trace  = buildTrace(grid, mode);
+  const layout = makeLayout(mode);
+
+  // Inject y tick labels
+  layout.scene.yaxis.tickvals = trace._yTick;
+  layout.scene.yaxis.ticktext = trace._yLabel;
+  delete trace._yTick;
+  delete trace._yLabel;
+
+  Plotly.react(el, [trace], layout, PLOTLY_CFG);
+
+  // Click → select nearest expiry row via pointNumber[0]
+  el.on('plotly_click', evt => {
+    if (!evt.points.length) return;
+    const pt  = evt.points[0];
+    // pointNumber is [row, col] for 2-D surface data
+    const row = Array.isArray(pt.pointNumber) ? pt.pointNumber[0] : 0;
+    selectExpiry(asset, row);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Expiry selection
+// ════════════════════════════════════════════════════════════════════
+function selectExpiry(asset, idx) {
+  SEL_EXP[asset] = idx;
+
+  // Refresh tabs
+  document.querySelectorAll(`#tabs-${asset} .exp-tab`).forEach((btn, i) => {
+    btn.classList.toggle('on', i === idx);
+  });
+
+  // Refresh params
+  renderParams(asset);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SVI params panel
+// ════════════════════════════════════════════════════════════════════
+function renderParams(asset) {
+  const fits   = DATA.assets[asset].svi_fits;
+  const keys   = Object.keys(fits);
+  const idx    = SEL_EXP[asset] ?? 0;
+  const expKey = keys[idx];
+  if (!expKey) return;
+
+  const fit   = fits[expKey];
+  const p     = fit.params;
+  const rmse  = fit.rmse_iv_pct;
+  const dte   = (fit.T * 365.25).toFixed(1);
+
+  const rClass = rmse < 1.5 ? 'good' : rmse < 4 ? 'warn' : 'bad';
+
+  // Helper to sign-format a float
+  const sf = (v, d=5) => (v >= 0 ? '+' : '') + v.toFixed(d);
+  const fwd = fit.forward.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  document.getElementById(`params-${asset}`).innerHTML = `
+    <div class="param-cell">
+      <div class="p-label">Expiry</div>
+      <div class="p-val accent">${expKey.slice(0,2)}-${expKey.slice(2,5)}-${expKey.slice(5)}</div>
+    </div>
+    <div class="param-cell">
+      <div class="p-label">Forward (F)</div>
+      <div class="p-val">${fwd}</div>
+    </div>
+    <div class="param-cell">
+      <div class="p-label">DTE</div>
+      <div class="p-val">${dte}d &nbsp;<span style="color:var(--text-muted);font-size:9px">(${fit.n_points} pts)</span></div>
+    </div>
+    <div class="param-cell">
+      <div class="p-label">a</div>
+      <div class="p-val">${sf(p.a)}</div>
+    </div>
+    <div class="param-cell">
+      <div class="p-label">b</div>
+      <div class="p-val">${p.b.toFixed(5)}</div>
+    </div>
+    <div class="param-cell">
+      <div class="p-label">&rho; (rho)</div>
+      <div class="p-val">${sf(p.rho)}</div>
+    </div>
+    <div class="param-cell">
+      <div class="p-label">m</div>
+      <div class="p-val">${sf(p.m)}</div>
+    </div>
+    <div class="param-cell">
+      <div class="p-label">&sigma; (sigma)</div>
+      <div class="p-val">${p.sigma.toFixed(5)}</div>
+    </div>
+    <div class="param-cell">
+      <div class="p-label">RMSE IV</div>
+      <div class="p-val"><span class="badge ${rClass}">${rmse.toFixed(3)}%</span></div>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Build card DOM for one asset
+// ════════════════════════════════════════════════════════════════════
+function buildCard(asset) {
+  const assetData = DATA.assets[asset];
+  const grid      = assetData.interpolated_grid;
+  const fits      = assetData.svi_fits;
+  const lower     = asset.toLowerCase();
+  const nFits     = Object.keys(fits).length;
+  const nGrid     = grid.k_grid ? grid.k_grid.length : 0;
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = `card-${asset}`;
+
+  card.innerHTML = `
+    <div class="card-hdr">
+      <span class="asset-name ${lower}">${asset} / USD</span>
+      <span class="card-meta">${nFits} EXPIRIES &nbsp;&middot;&nbsp; ${nGrid}-PT STRIKE GRID &nbsp;&middot;&nbsp; SVI</span>
+    </div>
+    <div class="plot-wrap">
+      <div class="plot-div" id="plot-${asset}"></div>
+    </div>
+    <div class="svi-section">
+      <div class="svi-toolbar">
+        <span class="svi-toolbar-label">SVI PARAMS</span>
+        <div class="exp-tabs" id="tabs-${asset}"></div>
+      </div>
+      <div class="params-grid" id="params-${asset}"></div>
+    </div>
+  `;
+
+  return card;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Build expiry tabs
+// ════════════════════════════════════════════════════════════════════
+function buildTabs(asset) {
+  const fits  = DATA.assets[asset].svi_fits;
+  const tabEl = document.getElementById(`tabs-${asset}`);
+  tabEl.innerHTML = '';
+
+  Object.keys(fits).forEach((key, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'exp-tab' + (idx === SEL_EXP[asset] ? ' on' : '');
+    btn.textContent = `${key.slice(0,2)}-${key.slice(2,5)}-${key.slice(5)}`;
+    btn.onclick = () => selectExpiry(asset, idx);
+    tabEl.appendChild(btn);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Mode toggle
+// ════════════════════════════════════════════════════════════════════
+function setMode(mode) {
+  MODE = mode;
+  document.getElementById('btn-iv').classList.toggle('on', mode === 'iv');
+  document.getElementById('btn-tv').classList.toggle('on', mode === 'tv');
+  if (!DATA) return;
+  ASSETS.forEach(a => { if (DATA.assets[a]) plotSurface(a, MODE); });
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════════════════════════════════
+async function init() {
+  const mainEl = document.getElementById('main');
+
+  // ── Load JSON ──────────────────────────────────────────────────
+  try {
+    const res = await fetch('vol_surface_data.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+    DATA = await res.json();
+  } catch (err) {
+    mainEl.innerHTML = `
+      <div class="state-box" style="grid-column:1/-1">
+        <div style="color:var(--red);letter-spacing:.1em">LOAD ERROR</div>
+        <div style="color:var(--text-muted);font-size:10px">${err.message}</div>
+        <div style="color:var(--text-muted);font-size:9px;margin-top:4px">
+          Ensure vol_surface_data.json is in the same directory and served over HTTP.
+        </div>
+      </div>`;
+    return;
+  }
+
+  // ── Timestamp ──────────────────────────────────────────────────
+  try {
+    const dt  = new Date(DATA.generated_at);
+    const fmt = dt.toUTCString().replace('GMT', 'UTC');
+    document.getElementById('ts-val').textContent = fmt;
+  } catch (_) {}
+
+  // ── Validate ───────────────────────────────────────────────────
+  const available = ASSETS.filter(a =>
+    DATA.assets[a] &&
+    DATA.assets[a].interpolated_grid &&
+    DATA.assets[a].interpolated_grid.expiries?.length
+  );
+
+  if (!available.length) {
+    mainEl.innerHTML = `<div class="state-box" style="grid-column:1/-1;color:var(--red)">
+      NO SURFACE DATA AVAILABLE</div>`;
+    return;
+  }
+
+  // ── Build DOM ──────────────────────────────────────────────────
+  mainEl.innerHTML = '';
+  available.forEach(asset => {
+    SEL_EXP[asset] = 0;
+    mainEl.appendChild(buildCard(asset));
+  });
+
+  // Single column if only one asset
+  if (available.length === 1) {
+    mainEl.style.gridTemplateColumns = '1fr';
+  }
+
+  // ── Render surfaces ────────────────────────────────────────────
+  // Use requestAnimationFrame to ensure DOM is painted before Plotly measures
+  requestAnimationFrame(() => {
+    available.forEach(asset => {
+      buildTabs(asset);
+      renderParams(asset);
+      plotSurface(asset, MODE);
+    });
+  });
+}
+
+init();
+</script>
+</body>
+</html>

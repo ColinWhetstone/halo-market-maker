@@ -1,7 +1,7 @@
 # ALGO/USD Market Making & Sentiment Research
 
 Research and backtesting suite for the ALGO/USD pair on Kraken/KuCoin.
-Three workstreams: **Avellaneda–Stoikov market making**, **Reddit sentiment analysis**, and data collection utilities.
+Three workstreams: **Avellaneda-Stoikov market making**, **Reddit sentiment analysis**, and data collection utilities.
 
 ---
 
@@ -10,42 +10,42 @@ Three workstreams: **Avellaneda–Stoikov market making**, **Reddit sentiment an
 ```
 mm-bot/
 ├── Market Making
-│   ├── as_engine.py          Core A-S pricing model
-│   ├── competitor_floor.py   Spread floor estimation
-│   ├── regime.py             Volatility regime classifier
-│   └── strategy.py           Full backtest runner
+│ ├── as_engine.py Core A-S pricing model
+│ ├── competitor_floor.py Spread floor estimation
+│ ├── regime.py Volatility regime classifier
+│ └── strategy.py Full backtest runner
 │
 ├── Data Collection
-│   ├── collect_data.py       Live tick data collector (Kraken)
-│   ├── fetch_data.py         One-shot order book snapshot
-│   └── download_history.py   Bulk OHLCV downloader (KuCoin)
+│ ├── collect_data.py Live tick data collector (Kraken)
+│ ├── fetch_data.py One-shot order book snapshot
+│ └── download_history.py Bulk OHLCV downloader (KuCoin)
 │
 ├── Sentiment Analysis
-│   ├── sentiment_collector.py   Scrapes Reddit, writes CSVs
-│   ├── sentiment_analysis.py    Correlation study + chart
-│   └── sentiment_backtest.py    Signal backtest + permutation test
+│ ├── sentiment_collector.py Scrapes Reddit, writes CSVs
+│ ├── sentiment_analysis.py Correlation study + chart
+│ └── sentiment_backtest.py Signal backtest + permutation test
 │
 └── Data Files
-    ├── algo_data.csv            Live tick data (collected by collect_data.py)
-    ├── algo_history.csv         90-day 1-min OHLCV (from download_history.py)
-    ├── algo_sentiment.csv       Raw Reddit posts (from sentiment_collector.py)
-    └── algo_sentiment_daily.csv Daily aggregated sentiment
+├── algo_data.csv Live tick data (collected by collect_data.py)
+├── algo_history.csv 90-day 1-min OHLCV (from download_history.py)
+├── algo_sentiment.csv Raw Reddit posts (from sentiment_collector.py)
+└── algo_sentiment_daily.csv Daily aggregated sentiment
 ```
 
 ---
 
-## Avellaneda–Stoikov Market Making
+## Avellaneda-Stoikov Market Making
 
 ### `as_engine.py`
 
-Implements the closed-form Avellaneda–Stoikov (A–S) model primitives. No market logic here — pure math.
+Implements the closed-form Avellaneda-Stoikov (A-S) model primitives. No market logic here: pure math.
 
-- **`calculate_reservation_price(mid, inventory, vol, gamma, tau)`** — Skews fair value away from mid based on inventory: `r = mid - q * gamma * sigma^2 * tau`. Long inventory pushes r below mid, short pushes it above.
-- **`calculate_spread(vol, gamma, tau, kappa)`** — Computes the optimal total quoted spread: `s* = gamma * sigma^2 * tau + (2/gamma) * ln(1 + gamma/kappa)`. Widens under high volatility or risk aversion; tightens when fills decay quickly (high kappa).
-- **`get_quotes(mid, inventory, vol, gamma, tau, kappa)`** — Returns `(bid, ask)` by centering the optimal spread around the reservation price.
+- **`calculate_reservation_price(mid, inventory, vol, gamma, tau)`**: Skews fair value away from mid based on inventory: `r = mid - q * gamma * sigma^2 * tau`. Long inventory pushes r below mid, short pushes it above.
+- **`calculate_spread(vol, gamma, tau, kappa)`**: Computes the optimal total quoted spread: `s* = gamma * sigma^2 * tau + (2/gamma) * ln(1 + gamma/kappa)`. Widens under high volatility or risk aversion; tightens when fills decay quickly (high kappa).
+- **`get_quotes(mid, inventory, vol, gamma, tau, kappa)`**: Returns `(bid, ask)` by centering the optimal spread around the reservation price.
 
 ```bash
-python as_engine.py   # runs a self-test with example parameters
+python as_engine.py # runs a self-test with example parameters
 ```
 
 ---
@@ -54,11 +54,11 @@ python as_engine.py   # runs a self-test with example parameters
 
 Estimates the tightest spread any competitor is currently quoting, used to prevent the strategy from posting quotes that are too wide to ever get filled.
 
-- **`compute_competitor_floor(spreads, window=100)`** — Rolling minimum of observed market spreads over the last `window` ticks.
-- **`compute_repricing_velocity(spreads, window=20)`** — Counts how often the spread changes within a rolling window. Higher velocity = more active competitors.
+- **`compute_competitor_floor(spreads, window=100)`**: Rolling minimum of observed market spreads over the last `window` ticks.
+- **`compute_repricing_velocity(spreads, window=20)`**: Counts how often the spread changes within a rolling window. Higher velocity = more active competitors.
 
 ```bash
-python competitor_floor.py   # prints last 10 floor + velocity estimates from algo_data.csv
+python competitor_floor.py # prints last 10 floor + velocity estimates from algo_data.csv
 ```
 
 ---
@@ -76,14 +76,14 @@ Classifies each bar into one of three volatility regimes using rolling lag-1 ret
 The regime label feeds directly into `strategy.py` to adjust risk aversion (`gamma`).
 
 ```bash
-python regime.py algo_data.csv   # prints regime distribution on any CSV with a mid_price column
+python regime.py algo_data.csv # prints regime distribution on any CSV with a mid_price column
 ```
 
 ---
 
 ### `strategy.py`
 
-Full A–S market making backtest. Wires together `as_engine.py`, `competitor_floor.py`, and `regime.py` into a tick-by-tick simulation.
+Full A-S market making backtest. Wires together `as_engine.py`, `competitor_floor.py`, and `regime.py` into a tick-by-tick simulation.
 
 **Key parameters:**
 
@@ -105,9 +105,9 @@ Full A–S market making backtest. Wires together `as_engine.py`, `competitor_fl
 **Outputs:** spread-capture PnL, inventory MTM PnL, Sharpe, fills per day, max drawdown. Compares dynamic (regime-adaptive) gamma vs static gamma=0.1 side-by-side.
 
 ```bash
-python strategy.py                      # single run on algo_data.csv
+python strategy.py # single run on algo_data.csv
 python strategy.py --csv algo_history.csv
-python strategy.py --monte-carlo        # 10-run Monte Carlo comparison
+python strategy.py --monte-carlo # 10-run Monte Carlo comparison
 ```
 
 ---
@@ -121,7 +121,7 @@ Continuous live tick collector. Polls Kraken every 10 seconds via `ccxt`, writin
 **Output columns:** `timestamp`, `best_bid`, `best_ask`, `bid_volume`, `ask_volume`, `mid_price`, `spread`, `last_trade_price`, `last_trade_volume`
 
 ```bash
-python collect_data.py   # runs indefinitely, Ctrl+C to stop
+python collect_data.py # runs indefinitely, Ctrl+C to stop
 ```
 
 ---
@@ -140,10 +140,10 @@ python fetch_data.py
 
 Downloads 90 days of 1-minute OHLCV for ALGO/USDT from KuCoin in paginated chunks of 720 candles. Overwrites `algo_history.csv` on each run. Includes rate-limit courtesy sleeps between requests.
 
-**Output:** `algo_history.csv` — columns: `timestamp` (ms epoch), `open`, `high`, `low`, `close`, `volume`
+**Output:** `algo_history.csv`: columns: `timestamp` (ms epoch), `open`, `high`, `low`, `close`, `volume`
 
 ```bash
-python download_history.py   # takes a few minutes; ~130k rows
+python download_history.py # takes a few minutes; ~130k rows
 ```
 
 ---
@@ -155,8 +155,8 @@ python download_history.py   # takes a few minutes; ~130k rows
 Scrapes Reddit for ALGO-related posts from two subreddits and writes two CSV files. Covers the last 90 days. Run this to refresh sentiment data before running the analysis or backtest.
 
 **Sources:**
-- `r/algorand` — latest new posts via `/new.json`
-- `r/CryptoCurrency` — posts mentioning ALGO via `/search.json?q=ALGO&sort=new`
+- `r/algorand`: latest new posts via `/new.json`
+- `r/CryptoCurrency`: posts mentioning ALGO via `/search.json?q=ALGO&sort=new`
 
 **Sentiment scoring:** `+1` if Reddit score > 0, `-1` if < 0, `0` if zero.
 
@@ -183,15 +183,15 @@ Loads `algo_sentiment_daily.csv` and `algo_history.csv`, resamples price to dail
 1. Resamples 1-min OHLCV to daily last-close and computes daily returns
 2. Inner-joins sentiment and price on date (72 aligned days)
 3. Runs `scipy.stats.pearsonr` at lags 0, 1, 2, 3, 5, 7 days for two signals:
-   - `sentiment_ratio` (positive posts / total posts)
-   - `total_posts` (raw post volume)
+- `sentiment_ratio` (positive posts / total posts)
+- `total_posts` (raw post volume)
 4. Prints a significance table and saves a two-panel chart
 
 **Key findings:**
 - `sentiment_ratio` lag-3: r = -0.24, p = 0.045 (high positivity precedes slight pullback)
 - `total_posts` lag-2: r = +0.24, p = 0.044 (higher volume precedes slight rally)
 
-**Output:** `sentiment_analysis.png` — ALGO daily close price (top panel) and daily sentiment ratio (bottom panel) over the aligned date range.
+**Output:** `sentiment_analysis.png`: ALGO daily close price (top panel) and daily sentiment ratio (bottom panel) over the aligned date range.
 
 ```bash
 python sentiment_analysis.py
@@ -205,8 +205,8 @@ Translates the two significant correlation findings into a simple long/flat sign
 
 **Signal logic:**
 - Go **long** when both conditions hold:
-  - `total_posts` 2 days ago > its rolling 14-day mean
-  - `sentiment_ratio` 3 days ago > 0.80
+- `total_posts` 2 days ago > its rolling 14-day mean
+- `sentiment_ratio` 3 days ago > 0.80
 - Go **flat** otherwise
 
 **Transaction costs:** 0.1% per round-trip (0.05% per leg, applied on entry and exit days).
@@ -225,7 +225,7 @@ Translates the two significant correlation findings into a simple long/flat sign
 | Days in market | 35 (39.8%) |
 | Permutation p-value | 0.062 |
 
-**Output:** `sentiment_backtest.png` — three panels: equity curve vs buy-and-hold (with shaded in-market periods), drawdown, and permutation test Sharpe distribution.
+**Output:** `sentiment_backtest.png`: three panels: equity curve vs buy-and-hold (with shaded in-market periods), drawdown, and permutation test Sharpe distribution.
 
 ```bash
 python sentiment_backtest.py
